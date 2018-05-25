@@ -7,8 +7,11 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 public class MainActivity extends AppCompatActivity {
@@ -31,6 +34,8 @@ public class MainActivity extends AppCompatActivity {
     volatile int SmsInfoCount = 0;//短信发送计数
     int SocketState;//短信连接状态
     private SMSContentObserver observer;
+    private Animation animation;
+    private ImageView running;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +60,8 @@ public class MainActivity extends AppCompatActivity {
         }),MainActivity.this,SMSContentObserver.MSG_SMS_WHAT);
         getContentResolver().registerContentObserver(uri,true, observer);
 
+        animation = AnimationUtils.loadAnimation(this, R.anim.rotate);
+
     }
 
     private void initView() {
@@ -78,10 +85,7 @@ public class MainActivity extends AppCompatActivity {
         btn_CleanSmsCount= findViewById(R.id.btn_CleanSmsCount);
         btn_CleanSmsCount.setOnClickListener(listener);
 
-        //scrollView = findViewById(R.id.sv);
-//        TextView textView = new TextView(this);
-//        textView.setText();
-//        scrollView.addView();
+        running = findViewById(R.id.iv);
 
     }
 
@@ -94,6 +98,8 @@ public class MainActivity extends AppCompatActivity {
                     mTcpClient.initSocketData(ip.getText().toString(), Integer.valueOf(port.getText().toString()));
                     Log.i("----","ip:"+ip.getText().toString()+"port:"+Integer.valueOf(port.getText().toString()));
                     btn_connect.setEnabled(false);
+                    running.startAnimation(animation);
+
                     break;
 
 
@@ -104,6 +110,9 @@ public class MainActivity extends AppCompatActivity {
                     //taskWork.ClosemStartWork();
 
                     btn_connect.setEnabled(true);
+                    animation.cancel();
+                    running.clearAnimation();
+
                     break;
                 //清除统计数据
                 case R.id.btn_CleanSmsCount:
