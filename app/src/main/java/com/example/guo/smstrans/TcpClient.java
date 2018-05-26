@@ -13,6 +13,18 @@ import java.net.SocketException;
 import java.util.Iterator;
 import java.util.concurrent.LinkedBlockingQueue;
 
+/**
+ * 异常总结：
+ *      client端关闭socket后：
+ *          发送线程interruptedException
+ *          接收线程SocketException
+ *      server端关闭socket后：
+ *          接收线程阻塞打开，直接重连
+ *          重连前调用close()会interrupted两个线程
+ *
+ *
+ */
+
 public class TcpClient {
     //连接状态
     public final int STATE_OPEN = 100;//socket打开
@@ -40,7 +52,6 @@ public class TcpClient {
     private Context mContext;
     private ISocketResponse mISocketResponse;
     private LinkedBlockingQueue<Packet> requestQueen = new LinkedBlockingQueue<>();
-    private final Object lock = new Object();
 
     //0X00 构造初始化
     TcpClient(Context mContext, ISocketResponse socketListener) {
@@ -55,6 +66,7 @@ public class TcpClient {
     }
 
     private synchronized void initConnect() {
+        // 重新连接前关闭之前的线程，所以有interrupted发生
         close();
         mState = STATE_OPEN;
         mConnectTCPServer = new Thread(new ConnectTCPServer());
@@ -64,8 +76,8 @@ public class TcpClient {
 
     private class ConnectTCPServer implements Runnable {
         public void run() {
-            Log.i("----", "Tcpclient客户端：开始连接...");
-            try {
+            Log.e("====", "Tcpclient客户端：开始连接...");
+//            try {
                 while (mState != STATE_CLOSE) {
                     try {
                         mState = STATE_CONNECT_START;
@@ -77,13 +89,13 @@ public class TcpClient {
                         mState = STATE_CONNECT_SUCCESS;
                         //界面展示
                         mISocketResponse.onSocketState(STATE_CONNECT_SUCCESS);
-                        Log.i("----", "Tcpclient客户端：连接成功...");
+                        Log.e("====", "Tcpclient客户端：连接成功...");
                     } catch (Exception e) {
                         e.printStackTrace();
                         mState = STATE_CONNECT_FAILED;
                         //界面展示
                         mISocketResponse.onSocketState(STATE_CONNECT_FAILED);
-                        Log.i("----", "Tcpclient客户端：连接失败...");
+                        Log.e("====", "Tcpclient客户端：连接失败...");
                     }
 
                     if (mState == STATE_CONNECT_SUCCESS) {
@@ -117,18 +129,19 @@ public class TcpClient {
                         }
                     }
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//                Log.i("----","ConnectTCPServer最外边的catch");
+//            }
 
-            Log.i("----", "Tcpclient客户端：连接End...");
+            Log.e("====", "Tcpclient客户端：连接End...");
         }
     }
 
     private class ReceiveMsg implements Runnable {
         @Override
         public void run() {
-            Log.i("----", "Tcpclient客户端：接收数据开始...");
+            Log.e("====", "Tcpclient客户端：接收数据开始...");
             try {
                 while (mState != STATE_CLOSE
                         && mState == STATE_CONNECT_SUCCESS
@@ -141,7 +154,7 @@ public class TcpClient {
                         if (length - read == 0) {   // 读取满了 5个字节
                             if (null != mISocketResponse) {
                                 response = new String(bodyBytes, "GB2312");
-                                Log.i("----", "Tcpclient客户端：接受数据:" + response);
+                                Log.e("====", "Tcpclient客户端：接受数据:" + response);
                                 mISocketResponse.onSocketResponse(response);
                             }
                             offset = 0;
@@ -153,19 +166,20 @@ public class TcpClient {
                         length = 1 - offset;    // length = 1
 
                     }
+                    // 服务端断开后走这里重新连接
                     initConnect();//走到这一步，说明服务器socket断了
                     break;
                 }
             } catch (SocketException e1) {
-                Log.i("----", "Tcpclient客户端：socket.close()...");
                 //客户端主动socket.close()会调用这里 java.net.SocketException: Socket closed
+                Log.e("====", "Tcpclient客户端ReceiveMsg：socket.close()...");
                 e1.printStackTrace();
             } catch (Exception e2) {
-                Log.i("----", "Tcpclient客户端：接受数据异常...");
+                Log.e("====", "Tcpclient客户端：接受数据异常...");
                 e2.printStackTrace();
             }
 
-            Log.i("----", "Tcpclient客户端：接受数据结束...");
+            Log.e("====", "Tcpclient客户端：接受数据结束...");
         }
     }
 
@@ -173,7 +187,7 @@ public class TcpClient {
     private class SendMsg implements Runnable {
         @Override
         public void run() {
-            Log.i("----", "Tcpclient客户端：发送数据开始...");
+            Log.e("====", "Tcpclient客户端：发送数据开始...");
             try {
                 while (mState != STATE_CLOSE && mState == STATE_CONNECT_SUCCESS && null != outStream) {
                     Packet item;
@@ -182,7 +196,7 @@ public class TcpClient {
                         outStream.flush();
                         item = null;
                     }
-                    Log.i("----", "Tcpclient客户端：发送数据woken up...");
+                    Log.e("====", "Tcpclient客户端：发送数据woken up...");
 //                    synchronized (lock) {
 //                        lock.wait();
 //                    }
@@ -190,14 +204,15 @@ public class TcpClient {
             } catch (SocketException e1) {
                 e1.printStackTrace();
                 //发送的时候出现异常，说明socket被关闭了(服务器关闭)
-                Log.i("----", "Tcpclient客户端：socket.close...");
+                Log.e("====", "Tcpclient客户端SendMsg：socket.close...");
                 //java.net.SocketException: sendto failed: EPIPE (Broken pipe)
                 initConnect();
             } catch (Exception e) {
-                Log.i("----", "Tcpclient客户端：发送数据异常...");
+                Log.e("====", "Tcpclient客户端：发送数据异常...");
+                // interruptedException
                 e.printStackTrace();
             }
-            Log.i("----", "Tcpclient客户端：发送数据结束...");
+            Log.e("====", "Tcpclient客户端：发送数据结束...");
         }
     }
 
@@ -244,7 +259,7 @@ public class TcpClient {
                 } finally {
                     mConnectTCPServer = null;
                 }
-
+                // 停止发送/接收线程
                 try {
                     if (null != mSendMsg && mSendMsg.isAlive()) {
                         mSendMsg.interrupt();
@@ -255,6 +270,7 @@ public class TcpClient {
                     mSendMsg = null;
                 }
 
+                // 停止线程
                 try {
                     if (null != mReceiveMsg && mReceiveMsg.isAlive()) {
                         mReceiveMsg.interrupt();

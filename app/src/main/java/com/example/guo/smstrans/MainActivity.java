@@ -45,10 +45,10 @@ public class MainActivity extends AppCompatActivity {
         initView();
         mTcpClient = new TcpClient(MainActivity.this.getApplicationContext(), socketListener);
         // 打开应用权限
-        if (!SmsWriteOpUtil.isWriteEnabled(getApplicationContext())) {
-            SmsWriteOpUtil.setWriteEnabled(
-                    getApplicationContext(), true);
-        }
+//        if (!SmsWriteOpUtil.isWriteEnabled(getApplicationContext())) {
+//            SmsWriteOpUtil.setWriteEnabled(
+//                    getApplicationContext(), true);
+//        }
 
         packet = new Packet();
         Uri uri= Uri.parse("content://sms");
