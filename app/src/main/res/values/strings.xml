@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">SMSTRANS</string>
 
-    <string name="ip">192.168.0.175</string>
-    <string name="Port">12543</string>
+    <string name="ip">192.168.1.106</string>
+    <string name="Port">12546</string>
     <string name="hint_ip">IP地址：</string>
     <string name="hint_port">端口号：</string>
     <string name="str_Cancel">取消连接</string>

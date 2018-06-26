@@ -48,7 +48,7 @@ public class SMSContentObserver extends ContentObserver {
         }
 
         if (uri.toString().equals("content://sms/raw") || uri.toString().equals("content://sms/")) {
-            //Log.e("====","无用，跳过～");
+            Log.e("====","无用，跳过～");
             return;
         }
 
@@ -92,11 +92,11 @@ public class SMSContentObserver extends ContentObserver {
         }
     }
 
-    public boolean deleteSms(int smsId) {
+    public boolean deleteSms(String smsId) {
         try {
             //假设游标没有关闭
             //delete (Uri url, String where, String[] selectionArgs)
-            int rows = mContext.getContentResolver().delete(Uri.parse("content://sms/"),"_id=?", new String[]{String.valueOf(smsId)});
+            int rows = mContext.getContentResolver().delete(Uri.parse("content://sms/"),"_id=?", new String[]{smsId});
             if (rows <= 0) {
                 Log.e("====", " sms id=" + msgId + "删除失败-影响行数" + rows + "\n");
                 return false;

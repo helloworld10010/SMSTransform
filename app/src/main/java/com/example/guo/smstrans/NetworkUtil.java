@@ -3,6 +3,8 @@ package com.example.guo.smstrans;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Build;
+import android.provider.Settings;
 
 public class NetworkUtil {
 
@@ -46,4 +48,5 @@ public class NetworkUtil {
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         return cm.getActiveNetworkInfo();
     }
+
 }
