@@ -57,14 +57,12 @@ public class TcpClient {
     private ISocketResponse mISocketResponse;
     private LinkedBlockingQueue<Packet> requestQueen = new LinkedBlockingQueue<>();
     private Context ctx;
-    private boolean first;
 
     //0X00 构造初始化
     TcpClient(Context mContext, ISocketResponse socketListener,boolean first) {
         this.mContext = mContext;
         this.mISocketResponse = socketListener;
         ctx = CustomApplication.getContextObject();
-        this.first = first;
     }
 
     void initSocketData(String host, int port) {
@@ -77,28 +75,6 @@ public class TcpClient {
         // 重新连接前关闭之前的线程，所以有interrupted发生
         close();
         // 连接关闭时马上开启飞行模式，防止短信到来无法转发
-        Log.e("==","first-"+String.valueOf(first)+"---isAirplaneModeOn(ctx)-"+String.valueOf(isAirplaneModeOn(ctx)));
-        if(!first && !isAirplaneModeOn(ctx)){
-            Log.e("---","飞行模式关闭状态,准备打开");
-            setAirplaneModeOn(ctx,true);
-
-            try {
-                Thread.sleep(1800);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            Log.e("---","飞行模式打开，准备打开wifi");
-            // 打开飞行模式后需要重新打开wifi
-            setWifiEnable(ctx,true);
-            Log.e("---","准备沉睡...");
-            try {
-                Thread.sleep(1800);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            Log.e("---","重新连接...");
-        }
-        Log.e("===","飞行if后边");
 
         mState = STATE_OPEN;
         mConnectTCPServer = new Thread(new ConnectTCPServer());
@@ -211,7 +187,6 @@ public class TcpClient {
 
                     }
                     // 服务端断开后走这里重新连接
-                    first = false;
                     initConnect();//走到这一步，说明服务器socket断了
                     break;
                 }
@@ -255,7 +230,6 @@ public class TcpClient {
                 initConnect();
 
             } catch (Exception e) {
-                first = false;
                 Log.e("====", "Tcpclient客户端：发送数据异常... 改变第一次标记");
                 // interruptedException
                 e.printStackTrace();
