@@ -17,6 +17,9 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.util.Iterator;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
 /**
@@ -31,12 +34,12 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class TcpClient {
     //连接状态
-    public final int STATE_OPEN = 100;//socket打开
-    public final int STATE_CLOSE = 200;//socket关闭
-    public final int STATE_CONNECT_START = 300;//开始连接server
-    public final int STATE_CONNECT_SUCCESS = 400;//连接成功
-    public final int STATE_CONNECT_FAILED = 500;//连接失败
-    public final int STATE_CONNECT_WAIT = 600;//等待连接
+    public static final int STATE_OPEN = 100;//socket打开
+    public static final int STATE_CLOSE = 200;//socket关闭
+    public static final int STATE_CONNECT_START = 300;//开始连接server
+    public static final int STATE_CONNECT_SUCCESS = 400;//连接成功
+    public static final int STATE_CONNECT_FAILED = 500;//连接失败
+    public static final int STATE_CONNECT_WAIT = 600;//等待连接
 
 
     private int mState = STATE_CONNECT_START;
@@ -56,16 +59,14 @@ public class TcpClient {
     private Context mContext;
     private ISocketResponse mISocketResponse;
     private LinkedBlockingQueue<Packet> requestQueen = new LinkedBlockingQueue<>();
-    private Context ctx;
+    private Executor executor = Executors.newFixedThreadPool(4);
 
-    //0X00 构造初始化
-    TcpClient(Context mContext, ISocketResponse socketListener,boolean first) {
+    public TcpClient(Context mContext, ISocketResponse socketListener) {
         this.mContext = mContext;
         this.mISocketResponse = socketListener;
-        ctx = CustomApplication.getContextObject();
     }
 
-    void initSocketData(String host, int port) {
+    public void initSocketData(String host, int port) {
         mIP = host;
         mPort = port;
         initConnect();
@@ -73,8 +74,9 @@ public class TcpClient {
 
     private synchronized void initConnect() {
         // 重新连接前关闭之前的线程，所以有interrupted发生
+        Log.e("====","initConnection/////////////////////////////////////////////////////////////////////////////");
+        SystemClock.sleep(500);
         close();
-        // 连接关闭时马上开启飞行模式，防止短信到来无法转发
 
         mState = STATE_OPEN;
         mConnectTCPServer = new Thread(new ConnectTCPServer());
@@ -85,23 +87,20 @@ public class TcpClient {
     private class ConnectTCPServer implements Runnable {
         public void run() {
             Log.e("====", "Tcpclient客户端：开始连接...");
-//            try {
             while (mState != STATE_CLOSE) {
                 try {
                     mState = STATE_CONNECT_START;
                     mClientSocket = new Socket();
-
                     //10分钟连接不上超时
                     int timeout = 600 * 1000;
                     mClientSocket.connect(new InetSocketAddress(mIP, mPort), timeout);
-                    mState = STATE_CONNECT_SUCCESS;
-                    //界面展示
-                    mISocketResponse.onSocketState(STATE_CONNECT_SUCCESS);
-                    Log.e("====", "Tcpclient客户端：连接成功...");
-
-                    // 连接成功后关闭飞行模式
-                    if(isAirplaneModeOn(ctx)){
-                        setAirplaneModeOn(ctx,false);
+                    if(mClientSocket.isConnected()){
+                        mState = STATE_CONNECT_SUCCESS;
+                        //界面展示
+                        mISocketResponse.onSocketState(STATE_CONNECT_SUCCESS);
+                        Log.e("====", "Tcpclient客户端：连接成功...");
+                    } else {
+                        throw new Exception("连接失败,重新连接..");
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -119,10 +118,8 @@ public class TcpClient {
                         e.printStackTrace();
                     }
 
-                    mReceiveMsg = new Thread(new ReceiveMsg());
-                    mReceiveMsg.start();
-                    mSendMsg = new Thread(new SendMsg());
-                    mSendMsg.start();
+                    executor.execute(new ReceiveMsg());
+                    executor.execute(new SendMsg());
                     break;
                 } else {
                     mState = STATE_CONNECT_WAIT;
@@ -130,22 +127,19 @@ public class TcpClient {
                     mISocketResponse.onSocketState(STATE_CONNECT_WAIT);
                     //如果有网络没有连接上，则定时取连接，没有网络则直接退出
                     if (NetworkUtil.isNetworkAvailable(mContext)) {
+                        Log.e("====","网络状态正常");
                         try {
-                            SystemClock.sleep(1000);//程序睡眠1秒钟
                             Thread.sleep(15 * 1000);
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                             break;
                         }
                     } else {
+                        Log.e("====","无网络，准备结束重连");
                         break;
                     }
                 }
             }
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//                Log.i("----","ConnectTCPServer最外边的catch");
-//            }
 
             Log.e("====", "Tcpclient客户端：连接End...");
         }
@@ -159,24 +153,6 @@ public class TcpClient {
                 while (mState != STATE_CLOSE
                         && mState == STATE_CONNECT_SUCCESS
                         && null != inStream) {
-//                    byte[] bodyBytes = new byte[8];
-//                    int offset = 0;
-//                    int length = 1;
-//                    int read;
-//                    while ((read = inStream.read(bodyBytes, offset, length)) > 0) {
-//                        if (length - read == 0) {   // 读取满了 5个字节
-//                            if (null != mISocketResponse) {
-//                                response = new String(bodyBytes, "GB2312");
-//                                Log.e("====", "Tcpclient客户端：接受数据:" + response);
-//                                mISocketResponse.onSocketResponse(response);
-//                            }
-//                            offset = 0;
-//                            length = 1;
-//                            continue;
-//                        }
-//                        // 读取不够5个字节
-//                        offset += read;     // offset = 4
-//                        length = 1 - offset;    // length = 1
                     BufferedReader br = new BufferedReader(new InputStreamReader(inStream));
                     String line;
                     while ((line = br.readLine()) != null) {
@@ -184,7 +160,6 @@ public class TcpClient {
                             Log.e("====", "Tcpclient客户端：接受数据:" + line);
                             mISocketResponse.onSocketResponse(line);
                         }
-
                     }
                     // 服务端断开后走这里重新连接
                     initConnect();//走到这一步，说明服务器socket断了
@@ -218,9 +193,6 @@ public class TcpClient {
                         item = null;
                     }
                     Log.e("====", "Tcpclient客户端：发送数据woken up...");
-//                    synchronized (lock) {
-//                        lock.wait();
-//                    }
                 }
             } catch (SocketException e1) {
                 e1.printStackTrace();
@@ -230,7 +202,7 @@ public class TcpClient {
                 initConnect();
 
             } catch (Exception e) {
-                Log.e("====", "Tcpclient客户端：发送数据异常... 改变第一次标记");
+                Log.e("====", "Tcpclient客户端：发送数据异常... ");
                 // interruptedException
                 e.printStackTrace();
             }
@@ -274,6 +246,7 @@ public class TcpClient {
                 try {
                     if (null != mConnectTCPServer && mConnectTCPServer.isAlive()) {
                         //停止该线程
+                        // 在阻塞状态中调用interrupt抛出interruptexception
                         mConnectTCPServer.interrupt();
                     }
                 } catch (Exception e) {
@@ -316,7 +289,7 @@ public class TcpClient {
 
     //------------------------------------------------------------------------------------------------
     //获取连接状态
-    int getmState() {
+    public int getmState() {
         //界面展示
         mISocketResponse.onSocketState(mState);
         return mState;
@@ -338,9 +311,7 @@ public class TcpClient {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-//        synchronized (lock) {
-//            lock.notifyAll();
-//        }
+
         return in.getId();
     }
 
@@ -354,38 +325,4 @@ public class TcpClient {
             }
         }
     }
-
-
-    public boolean isAirplaneModeOn(Context ctx) {
-        //4.2以下
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            return Settings.System.getInt(ctx.getContentResolver(),
-                    Settings.System.AIRPLANE_MODE_ON, 0) != 0;
-        } else { //4.2或4.2以上
-            return Settings.Global.getInt(ctx.getContentResolver(),
-                    Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
-        }
-    }
-
-    public void setAirplaneModeOn(Context ctx,boolean isEnable) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            Settings.System.putInt(ctx.getContentResolver(),
-                    Settings.System.AIRPLANE_MODE_ON, isEnable ? 1 : 0);
-        } else { //4.2或4.2以上
-            Settings.Global.putInt(ctx.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, isEnable ? 1 : 0);
-        }
-        Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED);
-        intent.putExtra("state", isEnable);
-        ctx.sendBroadcast(intent);
-    }
-
-    public void setWifiEnable(Context context, boolean state){
-        //首先，用Context通过getSystemService获取wifimanager
-        WifiManager mWifiManager = (WifiManager)
-                context.getSystemService(Context.WIFI_SERVICE);
-        //调用WifiManager的setWifiEnabled方法设置wifi的打开或者关闭，只需把下面的state改为布尔值即可（true:打开 false:关闭）
-        mWifiManager.setWifiEnabled(state);
-    }
-
-
 }

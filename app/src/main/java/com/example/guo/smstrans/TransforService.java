@@ -10,34 +10,38 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.PowerManager;
 import android.support.v4.app.NotificationCompat;
 import android.text.TextUtils;
 import android.util.Log;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 public class TransforService extends Service {
 
-    TcpClient mTcpClient = null;
-    private SMSContentObserver observer;
+    private TcpClient mTcpClient = null;
+    private SMSContentObserver mSmsContentObserver;
     int socketState;//短信连接状态
-    Handler handler = new Handler(){
+    private Handler handler = new Handler(){
         @Override
         public void handleMessage(Message msg) {
             Log.e("====","服务中的handler message");
             switch (msg.what){
 
-                        case 200:
+                        case TcpClient.STATE_CLOSE:
                             updateNotification("连接关闭");
                             break;
-                        case 300:
+                        case TcpClient.STATE_CONNECT_START:
                             updateNotification("开始连接");
                             break;
-                        case 500:
+                        case TcpClient.STATE_CONNECT_FAILED:
                             updateNotification("连接失败");
                             break;
-                        case 600:
+                        case TcpClient.STATE_CONNECT_WAIT:
                             updateNotification("等待连接");
                             break;
-                        case 400:
+                        case TcpClient.STATE_CONNECT_SUCCESS:
                             // 创建 notification
                             createNotifition("连接成功");
                             break;
@@ -47,6 +51,12 @@ public class TransforService extends Service {
         }
     };
     private Packet mPacket;
+    private PowerManager mPm;
+    private PowerManager.WakeLock mWl;
+
+    private Timer mTimer;
+    // 上次服务器回复时间
+    private volatile long lastResponseFromServer = System.currentTimeMillis();
 
 
     public TransforService() {
@@ -56,21 +66,28 @@ public class TransforService extends Service {
     public void onCreate() {
         super.onCreate();
         Log.e("===","Service onCreate");
-
+        mPm = (PowerManager)getSystemService(Context.POWER_SERVICE);
+        mWl = mPm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "myservice");
+        mWl.acquire();
 
         mTcpClient = new TcpClient(this.getApplicationContext(), new ISocketResponse() {
             @Override
             public void onSocketResponse(final String txt) {
+                // 更新接收时间
+                Log.e("====","上次接收时间为:"+lastResponseFromServer);
+                lastResponseFromServer = System.currentTimeMillis();
+                Log.e("====","更新接收时间为:"+lastResponseFromServer);
+
                 Log.e("===", "接收到的数据：" + txt);
-                if (observer != null && !TextUtils.isEmpty(txt)) {
-                    observer.deleteSms(txt);
+                if (mSmsContentObserver != null && !TextUtils.isEmpty(txt)) {
+                    mSmsContentObserver.deleteSms(txt);
                 }
             }
 
             @Override
             public void onSocketState(final int Flags) {
                 if (socketState == Flags) {
-                    Log.i("----", "SocketState退出");
+                    Log.i("====", "SocketState退出");
                     return;
                 } else {
                     socketState = Flags;
@@ -78,17 +95,30 @@ public class TransforService extends Service {
                 handler.sendEmptyMessage(socketState);
             }
 
-        }, true);
+        });
 
         mPacket = new Packet();
         Uri uri = Uri.parse("content://sms");
-        observer = new SMSContentObserver(new Handler(message -> {
+        mSmsContentObserver = new SMSContentObserver(new Handler(message -> {
             Log.e("====", (String) message.obj);
             mPacket.pack((String) message.obj);
             mTcpClient.send(mPacket);
             return true;
         }), this, SMSContentObserver.MSG_SMS_WHAT);
-        getContentResolver().registerContentObserver(uri, true, observer);
+        getContentResolver().registerContentObserver(uri, true, mSmsContentObserver);
+
+        mTimer = new Timer();
+        mTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                // 超过十分钟重连
+                if((System.currentTimeMillis()-lastResponseFromServer)>1000*60*10) {
+                    mTcpClient.initSocketData(Config.HOST,Config.PORT);
+                    Log.e("timer", "已经超过30分钟 "+"上次接受时间:" + lastResponseFromServer + "  当前时间:" + System.currentTimeMillis());
+                }
+            }
+            // 轮寻频率5分钟
+        },60*1000*1,1000*60*5);
     }
 
     @Override
@@ -104,21 +134,26 @@ public class TransforService extends Service {
             int port = intent.getIntExtra("port",0);
             Log.e("====","ip---"+ip+"  port----"+port);
             mTcpClient.initSocketData(ip,port);
+        } else {
+            mTcpClient.initSocketData(Config.HOST,Config.PORT);
         }
         return Service.START_REDELIVER_INTENT;
     }
 
     private void createNotifition(String state) {
-        Notification.Builder builder = new Notification.Builder(this);
-        builder.setContentText("短信转发工作中..");
-        builder.setContentTitle("短信转发监控");
-        builder.setSmallIcon(R.mipmap.ic_launcher);
-        builder.setTicker(state);
-        builder.setWhen(System.currentTimeMillis());
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 10, intent, PendingIntent.FLAG_CANCEL_CURRENT);
-        builder.setContentIntent(pendingIntent);
+
+        Notification.Builder builder = new Notification.Builder(this)
+        .setContentText("短信转发工作中..")
+        .setContentTitle("短信转发监控")
+        .setSmallIcon(R.mipmap.ic_launcher)
+        .setTicker(state)
+        .setWhen(System.currentTimeMillis())
+        .setContentIntent(pendingIntent);
+
         Notification notification = builder.build();
+
         startForeground(10000, notification);
     }
 
@@ -136,7 +171,11 @@ public class TransforService extends Service {
     public void onDestroy() {
         super.onDestroy();
         mTcpClient.close();
-        getContentResolver().unregisterContentObserver(observer);
+        getContentResolver().unregisterContentObserver(mSmsContentObserver);
+        if (mWl.isHeld()) {
+            mWl.release();
+        }
+        mTimer.purge();
         Log.e("====","Service destroy");
     }
 }
