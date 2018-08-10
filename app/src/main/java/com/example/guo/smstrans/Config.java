@@ -5,6 +5,6 @@ package com.example.guo.smstrans;
  */
 
 public class Config {
-    public static final String HOST = "192.168.0.175";
-    public static final int PORT = 12543;
+    public static final String HOST = "183.196.13.28";
+    public static final int PORT = 12307;
 }

@@ -34,11 +34,11 @@ public class MainActivity extends AppCompatActivity {
         ButterKnife.bind(this);
 
         // 打开应用权限
-        if (!SmsWriteOpUtil.isWriteEnabled(getApplicationContext())) {
-            boolean p = SmsWriteOpUtil.setWriteEnabled(
-                    getApplicationContext(), true);
-            Log.i("====", "打开删除短信权限-" + String.valueOf(p));
-        }
+//        if (!SmsWriteOpUtil.isWriteEnabled(getApplicationContext())) {
+//            boolean p = SmsWriteOpUtil.setWriteEnabled(
+//                    getApplicationContext(), true);
+//            Log.i("====", "打开删除短信权限-" + String.valueOf(p));
+//        }
     }
 
     @OnClick({R.id.btn_connect,R.id.btn_Cancel})

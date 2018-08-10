@@ -93,21 +93,18 @@ public class TcpClient {
                     mClientSocket = new Socket();
                     //10分钟连接不上超时
                     int timeout = 600 * 1000;
+                    Log.e("====","准备连接,IP:"+mIP+" PORT"+mPort);
                     mClientSocket.connect(new InetSocketAddress(mIP, mPort), timeout);
-                    if(mClientSocket.isConnected()){
-                        mState = STATE_CONNECT_SUCCESS;
-                        //界面展示
-                        mISocketResponse.onSocketState(STATE_CONNECT_SUCCESS);
-                        Log.e("====", "Tcpclient客户端：连接成功...");
-                    } else {
-                        throw new Exception("连接失败,重新连接..");
-                    }
+                    mState = STATE_CONNECT_SUCCESS;
+                    Log.e("====","连接成功");
+                    mISocketResponse.onSocketState(STATE_CONNECT_SUCCESS);
                 } catch (Exception e) {
                     e.printStackTrace();
                     mState = STATE_CONNECT_FAILED;
                     //界面展示
                     mISocketResponse.onSocketState(STATE_CONNECT_FAILED);
                     Log.e("====", "Tcpclient客户端：连接失败...");
+                    SystemClock.sleep(3000);
                 }
 
                 if (mState == STATE_CONNECT_SUCCESS) {
@@ -128,15 +125,8 @@ public class TcpClient {
                     //如果有网络没有连接上，则定时取连接，没有网络则直接退出
                     if (NetworkUtil.isNetworkAvailable(mContext)) {
                         Log.e("====","网络状态正常");
-                        try {
-                            Thread.sleep(15 * 1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                            break;
-                        }
                     } else {
                         Log.e("====","无网络，准备结束重连");
-                        break;
                     }
                 }
             }

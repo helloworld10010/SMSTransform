@@ -13,7 +13,38 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.regex.Pattern;
-
+/*
+FATAL EXCEPTION: main
+                                                   Process: com.hellotext.hello, PID: 26682
+                                                   java.lang.RuntimeException: Unable to start receiver com.hellotext.mmssms.SMSBroadcastReceiver: java.lang.IllegalArgumentException: Unable to find or allocate a thread ID.
+                                                       at android.app.ActivityThread.handleReceiver(ActivityThread.java:2407)
+                                                       at android.app.ActivityThread.access$1600(ActivityThread.java:135)
+                                                       at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1473)
+                                                       at android.os.Handler.dispatchMessage(Handler.java:102)
+                                                       at android.os.Looper.loop(Looper.java:137)
+                                                       at android.app.ActivityThread.main(ActivityThread.java:4998)
+                                                       at java.lang.reflect.Method.invokeNative(Native Method)
+                                                       at java.lang.reflect.Method.invoke(Method.java:515)
+                                                       at com.android.internal.os.ZygoteInit$MethodAndArgsCaller.run(ZygoteInit.java:777)
+                                                       at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:593)
+                                                       at dalvik.system.NativeStart.main(Native Method)
+                                                    Caused by: java.lang.IllegalArgumentException: Unable to find or allocate a thread ID.
+                                                       at android.database.DatabaseUtils.readExceptionFromParcel(DatabaseUtils.java:167)
+                                                       at android.database.DatabaseUtils.readExceptionFromParcel(DatabaseUtils.java:137)
+                                                       at android.content.ContentProviderProxy.insert(ContentProviderNative.java:468)
+                                                       at android.content.ContentResolver.insert(ContentResolver.java:1190)
+                                                       at com.hellotext.mmssms.SMSStorer.store(SMSStorer.java:115)
+                                                       at com.hellotext.mmssms.SMSStorer.storeReceived(SMSStorer.java:27)
+                                                       at com.hellotext.mmssms.SMSBroadcastReceiver.saveSms(SMSBroadcastReceiver.java:89)
+                                                       at com.hellotext.mmssms.SMSBroadcastReceiver.onReceive(SMSBroadcastReceiver.java:57)
+                                                       at android.app.ActivityThread.handleReceiver(ActivityThread.java:2400)
+                                                       at android.app.ActivityThread.access$1600(ActivityThread.java:135) 
+                                                       at android.app.ActivityThread$H.handleMessage(ActivityThread.java:1473) 
+                                                       at android.os.Handler.dispatchMessage(Handler.java:102) 
+                                                       at android.os.Looper.loop(Looper.java:137) 
+                                                       at android.app.ActivityThread.main(ActivityThread.java:4998) 
+                                                       at java.lang.reflect.Method.invokeNative(Native Method) 
+ */
 public class SMSContentObserver extends ContentObserver {
     private Handler mHandler;
     private Context mContext;
@@ -25,6 +56,7 @@ public class SMSContentObserver extends ContentObserver {
     /**仅观察收件箱*/
     public static final int MSG_SMS_INBOX_WHAT = 2;
     private volatile int msgId;
+    private String SerialNumber = android.os.Build.SERIAL;
 
     public SMSContentObserver(Handler handler, Context context, int observerType) {
         super(handler);
@@ -64,7 +96,7 @@ public class SMSContentObserver extends ContentObserver {
                     String msgDate = cursor.getString(cursor.getColumnIndex("date"));
                     String date = new SimpleDateFormat("yyyyMMddHHmmss", Locale.CHINA).format(new Date(Long.parseLong(msgDate)));
 //                    String msgObj = "收件箱\nId：" + msgId + "\n号码：" + msgAddr + "\n内容：" + msgBody + "\n类型：" + msgType + "\n时间：" + date + "\n";
-                    String msgObj = "address:" + msgAddr + "@body:" + msgBody + "@date:" + date + "@id"+msgId+"@";
+                    String msgObj = "address:" + msgAddr + "@body:" + msgBody + "@date:" + date + "@:id"+msgId+"@serial:"+SerialNumber+"@\n";
                     mHandler.sendMessage(Message.obtain(mHandler, MSG_SMS_WHAT, msgObj));
 
                 }

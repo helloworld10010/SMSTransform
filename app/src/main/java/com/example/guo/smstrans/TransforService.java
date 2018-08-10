@@ -23,10 +23,9 @@ public class TransforService extends Service {
     private TcpClient mTcpClient = null;
     private SMSContentObserver mSmsContentObserver;
     int socketState;//短信连接状态
-    private Handler handler = new Handler(){
+    Handler handler = new Handler(){
         @Override
         public void handleMessage(Message msg) {
-            Log.e("====","服务中的handler message");
             switch (msg.what){
 
                         case TcpClient.STATE_CLOSE:
@@ -85,14 +84,8 @@ public class TransforService extends Service {
             }
 
             @Override
-            public void onSocketState(final int Flags) {
-                if (socketState == Flags) {
-                    Log.i("====", "SocketState退出");
-                    return;
-                } else {
-                    socketState = Flags;
-                }
-                handler.sendEmptyMessage(socketState);
+            public void onSocketState(int flag) {
+                handler.sendEmptyMessage(flag);
             }
 
         });
@@ -113,8 +106,8 @@ public class TransforService extends Service {
             public void run() {
                 // 超过十分钟重连
                 if((System.currentTimeMillis()-lastResponseFromServer)>1000*60*10) {
+                    Log.e("timer", "已经超过10分钟 "+"上次接受时间:" + lastResponseFromServer + "  当前时间:" + System.currentTimeMillis());
                     mTcpClient.initSocketData(Config.HOST,Config.PORT);
-                    Log.e("timer", "已经超过30分钟 "+"上次接受时间:" + lastResponseFromServer + "  当前时间:" + System.currentTimeMillis());
                 }
             }
             // 轮寻频率5分钟
@@ -132,7 +125,6 @@ public class TransforService extends Service {
         if(intent!=null){
             String ip = intent.getStringExtra("ip");
             int port = intent.getIntExtra("port",0);
-            Log.e("====","ip---"+ip+"  port----"+port);
             mTcpClient.initSocketData(ip,port);
         } else {
             mTcpClient.initSocketData(Config.HOST,Config.PORT);
