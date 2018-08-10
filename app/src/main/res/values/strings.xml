@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">短信路由心跳版</string>
+    <string name="app_name">短信广播版</string>
 
     <string name="ip">183.196.13.28</string>
     <string name="Port">12307</string>
@@ -10,4 +10,5 @@
     <string name="str_Connect">连接</string>
     <string name="str_SendSms">开始监听</string>
     <string name="str_State">连接状态：</string>
+    <string name="title_activity_main2">Main2Activity</string>
 </resources>
